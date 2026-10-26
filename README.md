@@ -1,293 +1,289 @@
-# Rental Agreement Metadata Extraction
+﻿# Automated Lease Document Information Extractor
 
-## 1. Project Overview
+## 1. Executive Summary
+This repository implements an automated pipeline designed to capture key contractual attributes from unstructured lease agreements by combining Optical Character Recognition (OCR), Large Language Model (LLM) inference, and deterministic verification logic.
 
-This project extracts structured metadata from rental agreement documents using OCR text, an LLM, and rule-based validation.
+The framework targets six core contractual attributes:
+- **Agreement Value**
+- **Agreement Start Date**
+- **Agreement End Date**
+- **Renewal Notice (Days)**
+- **Party One**
+- **Party Two**
 
-The system extracts the following six fields:
-
-- Agreement Value
-- Agreement Start Date
-- Agreement End Date
-- Renewal Notice (Days)
-- Party One
-- Party Two
-
-The extracted results are compared with the provided ground-truth data to measure exact-match recall.
+Generated outputs are benchmarked against annotated reference records using strict exact-match recall.
 
 ---
 
-## 2. Processing Pipeline
+## 2. System Workflow
+The extraction engine operates through a multi-stage sequential architecture:
 
-The project follows this pipeline:
+    Unstructured Lease Files
+               ↓
+    Text Digitization (OCR / Parsing)
+               ↓
+    Text Sanitization & Formatting
+               ↓
+    LLM-Driven Attribute Capture
+               ↓
+    Deterministic Standardization
+               ↓
+    Constraint Verification
+               ↓
+    Curated Contract Metadata
+               ↓
+    Benchmarking & Scoring
 
-```text
-Rental Agreement Documents
-          ↓
-OCR / Text Extraction
-          ↓
-Clean and Prepare Text
-          ↓
-LLM Metadata Extraction
-          ↓
-Rule-Based Normalization
-          ↓
-Validation
-          ↓
-Final Metadata
-          ↓
-Evaluation
+### Stage 1: Text Digitization (OCR / Parsing)
+Raw lease files are digitized into machine-readable text via OCR. Because scanned contracts vary in clarity, the digitized text can exhibit artifacts including:
+- garbled or misread symbols
+- merged words and missing whitespace
+- corrupted numerical digits
+- misspelled proper nouns
+- broken layout alignment
 
-Step 1: OCR / Text Extraction
-The rental agreement documents are converted into text using OCR.
-The OCR text may contain errors such as:
-- incorrect characters
-- missing spaces
-- incorrect numbers
-- incorrect names
-- formatting issues
-The system works with the extracted document text and does not use outside information to correct the document.
+The pipeline operates strictly on the text recovered from the source file without fabricating or importing external context.
 
-Step 2: Clean and Prepare Text
-The extracted text is cleaned and prepared before sending it to the LLM.
-This makes the document text easier for the extraction model to process.
-Step 3: LLM Metadata Extraction
-The LLM receives the prepared rental agreement text and extracts the six required fields.
-The extraction prompt provides specific rules for each field.
-The LLM returns one JSON object containing the requested metadata.
-Step 4: Rule-Based Normalization
-The extracted values are normalized after LLM extraction.
-Examples include:
-- converting rent values to numeric values
-- converting renewal notice periods to days
-- standardizing dates to DD.MM.YYYY
-- keeping Party One and Party Two in the correct order
-- removing unwanted prefixes or descriptions from party names where applicable
-Step 5: Validation
-The extracted metadata is validated using predefined rules.
-For example:
-- dates follow the required DD.MM.YYYY format
-- missing or unreliable values are returned as null
-- agreement end dates are not calculated without reliable supporting information
-- Party One and Party Two must remain in the correct order
-- invalid dates present in the source are not silently corrected
-Step 6: Evaluation
-The predictions are compared against the provided ground-truth labels.
-The evaluation uses exact-match recall:
-Exact-match recall =
-Correct predictions / Eligible ground-truth values × 100
+### Stage 2: Text Sanitization & Formatting
+Before prompting the language model, the raw character stream is stripped of noise and structurally tidied so the model can parse clauses more reliably.
 
-The evaluation is performed separately for each metadata field.
+### Stage 3: LLM-Driven Attribute Capture
+The sanitized contract text is passed to the language model alongside field-specific extraction instructions. The model parses the legal prose and emits a single structured JSON payload containing the six target attributes.
 
-3. Project Structure
-metadata-extraction/
-│
-├── app/
-│   ├── config.py
-│   ├── extractor.py
-│   ├── loader.py
-│   ├── validator.py
-│   └── ...
-│
-├── data/
-│   ├── train/
-│   ├── test/
-│   ├── train.csv
-│   └── test.csv
-│
-├── outputs/
-│   ├── train_predictions.csv
-│   ├── test_predictions.csv
-│   ├── evaluation_summary.csv
-│   └── evaluation_failures.csv
-│
-├── metadata_extraction.ipynb
-├── requirements.txt
-├── README.md
-└── assignment-details.pdf
+### Stage 4: Deterministic Standardization
+Raw model outputs undergo programmatic post-processing to enforce uniform data types:
+- stripping symbols/text from monthly rent to retain pure numbers
+- translating notice timeframes into an integer day count
+- reformatting calendar dates into `DD.MM.YYYY`
+- preserving the sequence of `Party One` and `Party Two`
+- stripping honorifics, lineage tags, and location text from entity names
 
-4. Main Notebook
-The main implementation is provided in:
-metadata_extraction.ipynb
+### Stage 5: Constraint Verification
+Standardized fields are checked against strict domain guardrails:
+- calendar strings must adhere to `DD.MM.YYYY`
+- absent or low-confidence extractions default to `null`
+- expiration dates are only derived when backed by explicit start dates and duration clauses
+- contracting entities retain their original contractual sequence
+- impossible calendar dates found in the raw document are not arbitrarily altered
 
-The notebook contains the complete workflow for:
-1. loading the documents
-2. preparing the document text
-3. extracting metadata
-4. validating the extracted values
-5. generating predictions
-6. evaluating predictions
-7. generating failure cases
-8. running extraction on the test documents
+### Stage 6: Benchmarking & Scoring
+Finalized outputs are scored against the reference dataset using **Exact-Match Recall**:
 
-5. Required Environment
-The project uses Python and the following main libraries:
-- Python
-- Pandas
-- Requests
-- tqdm
-The LLM is accessed through a locally running Ollama server.
-The current configuration uses:
-Ollama
-Model: llama3:latest
-Endpoint: http://localhost:11434/api/chat
+    Exact-Match Recall = (Total Exact Matches / Total Valid Reference Entries) × 100
 
-No external LLM API is required.
+Scores are computed independently for each of the six attributes.
 
-6. Setup
-Create and activate the project environment:
-conda create -n metadata-extraction python=3.12
-conda activate metadata-extraction
+---
 
-Install the required packages:
-pip install -r requirements.txt
+## 3. Directory Layout
 
-Make sure Ollama is running locally and the required model is available:
-ollama run llama3:latest
+    metadata-extraction-main/
+    │
+    ├── app/
+    │   ├── __init__.py
+    │   ├── config.py
+    │   ├── document_loader.py
+    │   ├── evaluator.py
+    │   ├── extractor.py
+    │   ├── text_preprocessor.py
+    │   └── validation.py
+    │
+    ├── data/
+    │   ├── train/
+    │   ├── test/
+    │   ├── train.csv
+    │   └── test.csv
+    │
+    ├── outputs/
+    │   ├── train_predictions.csv
+    │   ├── test_predictions.csv
+    │   ├── evaluation_summary.csv
+    │   └── evaluation_failures.csv
+    │
+    ├── notebooks/
+    │   └── 01_rental_metadata_extraction.ipynb
+    │
+    ├── tests/
+    │   └── test_validation.py
+    │
+    ├── requirements.txt
+    └── README.md
 
-7. Running the Project
-Open the project in VS Code and open:
-metadata_extraction.ipynb
+---
 
-Select the Python kernel from the metadata-extraction environment.
-Then run the notebook cells from top to bottom.
-The notebook will:
-Load documents
-   ↓
-Prepare OCR text
-   ↓
-Extract metadata using LLM
-   ↓
-Normalize and validate results
-   ↓
-Save predictions
-   ↓
-Evaluate training predictions
-   ↓
-Generate failure report
-   ↓
-Extract metadata from test documents
-   ↓
-Save test predictions
+## 4. Primary Execution Notebook
+The end-to-end execution script is housed in:
+`notebooks/01_rental_metadata_extraction.ipynb`
 
-The training documents are used for evaluation because their ground-truth metadata is available in train.csv.
-The test documents are processed separately and their predictions are saved without calculating recall, since the test ground-truth values are not used for evaluation.
+This interactive notebook orchestrates the entire lifecycle:
+1. Ingesting raw source files
+2. Sanitizing digitized text streams
+3. Querying the LLM for attribute extraction
+4. Enforcing standardization and verification guardrails
+5. Exporting structured prediction tables
+6. Computing recall metrics on the training split
+7. Compiling a discrepancy log for error analysis
+8. Generating final predictions on the unseen test split
 
-8. Output Files
-train_predictions.csv
-Contains the metadata extracted from the training documents.
-The file contains:
-- File Name
-- Split
-- Agreement Value
-- Agreement Start Date
-- Agreement End Date
-- Renewal Notice (Days)
-- Party One
-- Party Two
-- Extraction Status
-test_predictions.csv
-Contains the metadata extracted from the test documents.
-The test set contains four documents. Since ground-truth labels are not used for the test set, this file contains the final extracted predictions for those documents.
-evaluation_summary.csv
-Contains the evaluation results for each metadata field.
-Example:
-Field                         Correct    Eligible    Exact-match recall
-Agreement Value                  ...         ...             ...
-Agreement Start Date             ...         ...             ...
-Agreement End Date               ...         ...             ...
-Renewal Notice (Days)            ...         ...             ...
-Party One                        ...         ...             ...
-Party Two                        ...         ...             ...
+---
 
-evaluation_failures.csv
-Contains the documents where the predicted value does not exactly match the ground-truth value.
-It is used to analyse extraction errors.
+## 5. Software & Model Dependencies
+The codebase is built in Python and relies on core data and HTTP libraries:
+- `Python`
+- `Pandas`
+- `Requests`
+- `tqdm`
 
-9. Important Extraction Rules
-Agreement Value
-The system extracts the monthly rental amount.
-It does not use:
-- security deposit
-- advance
-- maintenance charges
-- electricity charges
-Agreement Start Date
-The system identifies the agreement commencement or effective date.
-Payment dates are not treated as the agreement start date.
-The extracted date is returned in:
-DD.MM.YYYY
+Inference is powered locally via an **Ollama** instance with zero reliance on paid third-party cloud APIs:
+- **Runtime:** Ollama
+- **Active Checkpoint:** `llama3:latest`
+- **Local URI:** `http://localhost:11434/api/chat`
 
-Agreement End Date
-The system looks for an explicit expiry or end date.
-It also considers agreement duration when the document provides reliable evidence such as:
-- valid for X months
-- for X months from this date
-- agreement made only for X months from this date
-- tenure of X months
-An end date may be calculated when both a reliable start date and reliable duration are available.
-If an explicit end date is present in the document, that date is used.
-Dates from the source are not silently replaced with a different date when OCR or document data contains an invalid calendar date.
-Renewal Notice
-Only the notice period associated with termination, cancellation, or ending the agreement is extracted.
-Examples:
-three month advance notice → 90
-2 months notice → 60
-60 days notice → 60
-15 days advance notice → 15
-one week notice → 7
+---
 
-Agreement duration or rental period is not treated as the notice period.
-Party One and Party Two
-The parties are extracted according to their order in the agreement.
-First contracting party  → Party One
-Second contracting party → Party Two
+## 6. Environment Configuration
+Provision and activate an isolated Conda environment:
 
-The extraction focuses on the opening contracting-party section, such as the BY AND BETWEEN section.
-Witnesses and unrelated people mentioned later in the document are not selected as contracting parties.
-The party extraction rules also remove unnecessary information such as:
-- Mr.
-- Mrs.
-- Ms.
-- Prof.
-- S/o
-- D/o
-- W/o
-- addresses
-- property descriptions
-where applicable.
+    conda create -n metadata-extraction python=3.12
+    conda activate metadata-extraction
 
-10. Ground-Truth Correction
-During manual validation of the training data, the final two training records were identified as being swapped.
-The records for:
-54770958-Rental-Agreement
-54945838-Rental-Agreement
+Install all required Python packages:
 
-were therefore corrected in data/train.csv so that their metadata corresponds to the correct rental agreement documents.
-This correction is important because the evaluation compares predictions against the corresponding document's ground-truth values.
-No changes were made to the test ground-truth because the test set is used only for final prediction.
+    pip install -r requirements.txt
 
-11. Evaluation
-The main evaluation metric is exact-match recall.
-A prediction is counted as correct only when the normalized prediction matches the corresponding ground-truth value.
-The evaluation is performed independently for all six fields.
-The current training-set evaluation is:
-Field                         Correct    Eligible    Exact-match recall
-Agreement Value                  6          10              60.00%
-Agreement Start Date             5          10              50.00%
-Agreement End Date               2          10              20.00%
-Renewal Notice (Days)            5           9              55.56%
-Party One                        5          10              50.00%
-Party Two                        5          10              50.00%
+Start the local Ollama server and pull the Llama 3 checkpoint:
 
-The failure report is used to identify incorrect, missing, or mismatched predictions and to improve the extraction prompt and validation rules.
+    ollama run llama3:latest
 
-12. Limitations
-The extraction quality depends on:
-- OCR quality
-- document formatting
-- LLM extraction accuracy
-- OCR errors in names, dates, and numbers
-- ambiguous wording in rental agreements
-The system therefore combines LLM extraction with rule-based normalization and validation instead of relying only on the LLM output.
-```
+---
+
+## 7. Execution Guide
+Launch VS Code, open the project folder, and navigate to the main notebook (`notebooks/01_rental_metadata_extraction.ipynb`). Bind the notebook kernel to your `metadata-extraction` Conda environment and execute all cells sequentially:
+
+    Ingest source contracts
+              ↓
+    Sanitize OCR text
+              ↓
+    Run LLM inference
+              ↓
+    Standardize & verify fields
+              ↓
+    Export training predictions
+              ↓
+    Score against training reference data
+              ↓
+    Export discrepancy report
+              ↓
+    Run inference on test contracts
+              ↓
+    Export test predictions
+
+The training split is used for quantitative scoring since verified labels exist in `data/train.csv`. The test split is processed purely for inference—predictions are exported without recall scoring so the test set remains an unbiased holdout.
+
+---
+
+## 8. Generated Artifacts
+* **`train_predictions.csv`**: Stores extracted attributes for the training corpus, structured with the following columns:
+  - `File Name`
+  - `Split`
+  - `Agreement Value`
+  - `Agreement Start Date`
+  - `Agreement End Date`
+  - `Renewal Notice (Days)`
+  - `Party One`
+  - `Party Two`
+  - `Extraction Status`
+* **`test_predictions.csv`**: Stores final extracted metadata for the four holdout contracts in the test split.
+* **`evaluation_summary.csv`**: Tabulates field-by-field accuracy metrics:
+
+      Field                  Correct    Eligible    Exact-match recall (%)
+      Agreement Value           7          10               70.00
+      Agreement Start Date      3          10               30.00
+      Agreement End Date        2          10               20.00
+      Renewal Notice (Days)     5           9               55.56
+      Party One                 5          10               50.00
+      Party Two                 6          10               60.00
+
+* **`evaluation_failures.csv`**: Logs every instance where a model prediction diverged from the reference label, enabling targeted debugging.
+
+---
+
+## 9. Field-Specific Extraction Guidelines
+
+### Agreement Value
+Captures strictly the recurring monthly lease payment. It explicitly ignores:
+- refundable security deposits
+- upfront advances
+- property maintenance fees
+- utility and electricity bills
+
+### Agreement Start Date
+Pinpoints the date the lease officially takes effect (ignoring stamp paper purchase or rent due dates) and formats it as `DD.MM.YYYY`.
+
+### Agreement End Date
+Captures the stated termination date of the contract. When an explicit calendar date is omitted, the system derives the expiration date only if a verified start date is paired with clear duration phrasing, such as:
+- *valid for X months*
+- *for X months from this date*
+- *agreement made only for X months from this date*
+- *tenure of X months*
+
+If an explicit end date is written in the text, it takes precedence. Invalid calendar dates caused by typos in the source document are never silently overwritten.
+
+### Renewal Notice (Days)
+Captures only the advance warning period required to terminate or vacate the lease, converting time units into total days:
+- *three month advance notice* → `90`
+- *2 months notice* → `60`
+- *60 days notice* → `60`
+- *15 days advance notice* → `15`
+- *one week notice* → `7`
+
+Overall lease tenure is never confused with the termination notice period.
+
+### Party One and Party Two
+Contracting entities are assigned strictly by their order of appearance in the introductory recitals (e.g., the *"BY AND BETWEEN"* clause):
+- **Initial contracting entity** → `Party One`
+- **Subsequent contracting entity** → `Party Two`
+
+Signatory witnesses and third parties mentioned in later clauses are ignored. Post-processing strips out extraneous text including:
+- Honorifics (`Mr.`, `Mrs.`, `Ms.`, `Prof.`)
+- Lineage indicators (`S/o`, `D/o`, `W/o`)
+- Street addresses and property descriptions
+
+---
+
+## 10. Reference Dataset Alignment
+While auditing `data/train.csv` against the raw contract files, the ground-truth rows for the final two training documents were found to be transposed:
+- `54770958-Rental-Agreement`
+- `54945838-Rental-Agreement`
+
+These two rows were swapped back to their rightful document IDs in `data/train.csv` so that automated scoring compares each prediction against its true source contract. The test split (`data/test.csv`) was left untouched.
+
+---
+
+## 11. Benchmark Results
+System accuracy is quantified via **Exact-Match Recall**, where a prediction counts as a hit only if its normalized string is identical to the reference entry. Each of the six fields is graded independently.
+
+Current performance on the training corpus:
+
+| Field | Correct | Eligible | Exact-Match Recall (%) |
+| :--- | :---: | :---: | :---: |
+| **Agreement Value** | 7 | 10 | 70.00 |
+| **Agreement Start Date** | 3 | 10 | 30.00 |
+| **Agreement End Date** | 2 | 10 | 20.00 |
+| **Renewal Notice (Days)** | 5 | 9 | 55.56 |
+| **Party One** | 5 | 10 | 50.00 |
+| **Party Two** | 6 | 10 | 60.00 |
+
+Discrepancy logs generated during evaluation guide iterative refinements to both the LLM system prompt and the regex standardization layer.
+
+---
+
+## 12. Operational Constraints & Challenges
+Overall extraction fidelity is bounded by several real-world factors:
+- clarity and resolution of scanned source images
+- inconsistent layout structures across legal templates
+- reasoning limits of the local language model
+- character-level OCR corruption within proper names, dates, and figures
+- vague or non-standard legal phrasing in regional agreements
+
+To mitigate these risks, the architecture pairs neural LLM extraction with deterministic rule-based standardization and validation rather than trusting raw model generations alone.
