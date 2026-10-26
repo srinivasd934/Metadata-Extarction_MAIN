@@ -1,0 +1,9 @@
+pandas
+requests
+tqdm
+python-docx
+pytesseract
+Pillow
+pypdf
+jupyter
+pytest
